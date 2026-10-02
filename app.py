@@ -6,7 +6,7 @@ import urllib.error
 import ssl
 from datetime import datetime
 
-# تخطي فحص شهادات الأمان لتجنب تعليق الاتصال في بيئات الأندرويد والسيرفرات
+# تخطي فحص شهادات الأمان لتجنب تعليق الاتصال
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
@@ -23,7 +23,6 @@ except ImportError:
 app = Flask("DiamondKernelGlobalEngine")
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "diamond_global_ultra_secure_key_2026_9333")
 
-# تحديد مسار مطلق لقاعدة البيانات لضمان الاستقرار التام على السيرفرات السحابية
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 DB_FILE = os.path.join(BASE_DIR, "diamond_kernel_global.db")
 
@@ -110,8 +109,8 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
         return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
 
     try:
-        # استخدام الإصدار الأحدث والأكثر استقراراً للاتصال بالنموذج
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        # استخدام نموذج gemini-1.5-flash عبر واجهة v1 المعتمدة لضمان عدم حدوث خطأ 404
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
@@ -146,9 +145,10 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
             else:
                 result_text = f"⚠️ خطأ من الخادم برمز الاستجابة: {response.status}"
     except urllib.error.HTTPError as e:
-        result_text = f"⚠️ خطأ API (رمز {e.code}): تحقق من صحة مفتاح الـ API أو صلاحية الرابط."
+        error_message = e.read().decode('utf-8', errors='ignore')
+        result_text = f"⚠️️ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. تفاصيل الخطأ: {error_message[:150]}"
     except urllib.error.URLError as e:
-        result_text = f"⚠️ خطأ في الشبكة العالمية."
+        result_text = f"⚠️ خطأ في الشبكة العالمية أو تعذر الوصول للخادم."
     except Exception as e:
         result_text = f"⚠ حدث خطأ داخلي في النواة: {str(e)}"
 
@@ -247,7 +247,6 @@ def dashboard():
                 <div id="ai-form">
                     <label><b>🔑 مفتاح الـ API:</b></label>
                     <div class="input-wrapper">
-                        <!-- تم جعل الحقل من نوع text بالكامل لمنع أي قناع كلمات مرور من المتصفح -->
                         <input type="text" name="gemini_token_x" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
                         <button type="button" class="toggle-view-btn" onclick="maskApiKeyToggle()">👁️ إخفاء/إظهار</button>
                     </div>
