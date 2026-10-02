@@ -159,7 +159,6 @@ def dashboard():
         session['session_id'] = os.urandom(16).hex()
     
     if request.method == 'POST':
-        # استخدام الاسم الجديد الخفي للحقل لتجاوز نظام كلمات المرور في كروم
         user_api_key = request.form.get("gemini_token_x", "").strip()
         req_type = request.form.get("req_type", "research")
         query = request.form.get("query", "").strip()
@@ -206,10 +205,17 @@ def dashboard():
             p.sub-title { color: var(--text-muted); font-size: 14px; margin: 0; }
             .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
             label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #d1d5db; }
+            
+            .input-wrapper { display: flex; align-items: center; background: #030712; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden; transition: all 0.3s ease; }
+            .input-wrapper:focus-within { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+            .input-wrapper input { flex: 1; padding: 14px; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; }
+            
+            .toggle-view-btn { background: transparent; border: none; color: var(--accent-blue); padding: 0 15px; cursor: pointer; font-size: 14px; font-weight: bold; }
+            .toggle-view-btn:hover { opacity: 0.8; transform: none; }
+
             input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
-            /* إخفاء النقاط للحفاظ على الأمان البصري دون أي ارتباط بنظام كلمات المرور */
-            .secure-text-input { -webkit-text-security: disc; }
             input[type="text"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+            
             .btn-group { display: flex; gap: 12px; }
             button { flex: 1; padding: 14px; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: all 0.2s; }
             button.mic-btn { background: var(--accent-red); flex: 0.4; }
@@ -238,9 +244,12 @@ def dashboard():
             <div class="card">
                 <h3>🛠 لوحة التحكم والعمليات المتقدمة</h3>
                 <div id="ai-form">
-                    <!-- اسم حقل عشوائي وغير حساس لمنع متصفح كروم من تفعيل مدير كلمات المرور -->
                     <label><b>🔑 مفتاح الـ API:</b></label>
-                    <input type="text" name="gemini_token_x" id="api-key-input" class="secure-text-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
+                    <div class="input-wrapper">
+                        <!-- تم جعل الحقل من نوع text بالكامل لمنع أي قناع كلمات مرور من المتصفح -->
+                        <input type="text" name="gemini_token_x" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
+                        <button type="button" class="toggle-view-btn" onclick="maskApiKeyToggle()">👁️ إخفاء/إظهار</button>
+                    </div>
 
                     <label><b>اختر نمط التشغيل المتقدم:</b></label>
                     <select name="req_type" id="req-type-select">
@@ -294,6 +303,17 @@ def dashboard():
         </div>
 
         <script>
+            let isMasked = false;
+            function maskApiKeyToggle() {
+                const input = document.getElementById('api-key-input');
+                isMasked = !isMasked;
+                if (isMasked) {
+                    input.style.webkitTextSecurity = 'disc';
+                } else {
+                    input.style.webkitTextSecurity = 'none';
+                }
+            }
+
             function executeAjaxSubmit() {
                 const apiKeyInput = document.getElementById('api-key-input');
                 const reqTypeSelect = document.getElementById('req-type-select');
@@ -372,7 +392,7 @@ def dashboard():
                     console.error('Error:', error);
                     btn.disabled = false;
                     btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
-                    sysStatus.innerText = "⚠️ حدث خطأ أثناء الاتصال بالخادم.";
+                    sysStatus.innerText = "⚠️️ حدث خطأ أثناء الاتصال بالخادم.";
                 });
             }
 
