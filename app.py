@@ -65,7 +65,7 @@ def load_history_for_session(session_id):
                 "time": row[5]
             })
     except Exception as e:
-        print(f"⚠️️ خطأ في تحميل السجل: {e}")
+        print(f"⚠ خطأ في تحميل السجل: {e}")
     return registry
 
 def persist_to_db(session_id, item_type, query, content, blueprint=""):
@@ -106,7 +106,7 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
     api_key = user_api_key.strip() if user_api_key else os.environ.get("GEMINI_API_KEY", "").strip()
 
     if not api_key:
-        return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
+        return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى أو ضبطه في متغيرات البيئة على Render.", ""
 
     models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
     success = False
@@ -218,7 +218,7 @@ def dashboard():
             .input-wrapper input { flex: 1; padding: 14px; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; }
             
             .toggle-view-btn { background: transparent; border: none; color: var(--accent-blue); padding: 0 15px; cursor: pointer; font-size: 14px; font-weight: bold; }
-            .toggle-view-btn:hover { opacity: 0.8; transform: none; }
+            .toggle-view-btn:hover { opacity: 0.8; }
 
             input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
             input[type="text"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
