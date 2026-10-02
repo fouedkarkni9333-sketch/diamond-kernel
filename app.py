@@ -110,7 +110,8 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
         return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
 
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        # استخدام الإصدار الأحدث والأكثر استقراراً للاتصال بالنموذج
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
@@ -145,7 +146,7 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
             else:
                 result_text = f"⚠️ خطأ من الخادم برمز الاستجابة: {response.status}"
     except urllib.error.HTTPError as e:
-        result_text = f"⚠️ خطأ API (رمز {e.code}): تحقق من صحة مفتاح الـ API."
+        result_text = f"⚠️ خطأ API (رمز {e.code}): تحقق من صحة مفتاح الـ API أو صلاحية الرابط."
     except urllib.error.URLError as e:
         result_text = f"⚠️ خطأ في الشبكة العالمية."
     except Exception as e:
@@ -392,7 +393,7 @@ def dashboard():
                     console.error('Error:', error);
                     btn.disabled = false;
                     btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
-                    sysStatus.innerText = "⚠️️ حدث خطأ أثناء الاتصال بالخادم.";
+                    sysStatus.innerText = "⚠ حدث خطأ أثناء الاتصال بالخادم.";
                 });
             }
 
