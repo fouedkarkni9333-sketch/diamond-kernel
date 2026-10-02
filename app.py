@@ -15,7 +15,7 @@ else:
     ssl._create_default_https_context = _create_unverified_https_context
 
 try:
-    from flask import Flask, render_template_string, request, redirect, url_for, send_file, session
+    from flask import Flask, render_template_string, request, redirect, url_for, send_file, session, jsonify
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -65,7 +65,7 @@ def load_history_for_session(session_id):
                 "time": row[5]
             })
     except Exception as e:
-        print(f"⚠ خطأ في تحميل السجل: {e}")
+        print(f"⚠️ خطأ في تحميل السجل: {e}")
     return registry
 
 def persist_to_db(session_id, item_type, query, content, blueprint=""):
@@ -82,7 +82,14 @@ def persist_to_db(session_id, item_type, query, content, blueprint=""):
     except Exception as e:
         print(f"⚠️ خطأ الحفظ في القاعدة: {e}")
         
-    return row_id
+    return {
+        "id": row_id,
+        "type": item_type,
+        "query": query,
+        "content": content,
+        "blueprint": blueprint,
+        "time": t_now
+    }
 
 def generate_ai_response(req_type, user_query, user_api_key=""):
     result_text = ""
@@ -99,57 +106,51 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
     api_key = user_api_key.strip() if user_api_key else os.environ.get("GEMINI_API_KEY", "").strip()
 
     if not api_key:
-        return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى أو ضبطه في متغيرات البيئة على Render.", ""
+        return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
 
-    models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
-    success = False
-
-    for model_name in models_to_try:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-            payload = {
-                "contents": [{
-                    "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
-                }]
-            }
-            
-            data_bytes = json.dumps(payload).encode('utf-8')
-            req = urllib.request.Request(url, data=data_bytes, headers={'Content-Type': 'application/json'}, method='POST')
-            
-            with urllib.request.urlopen(req, timeout=50) as response:
-                if response.status == 200:
-                    res_body = response.read().decode('utf-8')
-                    data = json.loads(res_body)
+    try:
+        # استخدام نموذج gemini-1.5-flash عبر واجهة v1 المعتمدة لضمان عدم حدوث خطأ 404
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{
+                "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
+            }]
+        }
+        
+        data_bytes = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data_bytes, headers={'Content-Type': 'application/json'}, method='POST')
+        
+        with urllib.request.urlopen(req, timeout=50) as response:
+            if response.status == 200:
+                res_body = response.read().decode('utf-8')
+                data = json.loads(res_body)
+                
+                try:
+                    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                except (KeyError, IndexError):
+                    return "⚠️ استجاب الخادم بنجاح ولكن المحتوى عاد فارغاً أو تم حظره بواسطة سياسة الأمان.", ""
+                
+                cleaned_text = raw_text
+                if "<svg" in cleaned_text and "</svg>" in cleaned_text:
+                    start_idx = cleaned_text.find("<svg")
+                    end_idx = cleaned_text.rfind("</svg>") + 6
                     
-                    try:
-                        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                    except (KeyError, IndexError):
-                        return "⚠️ استجاب الخادم بنجاح ولكن المحتوى عاد فارغاً أو تم حظره بواسطة سياسة الأمان.", ""
-                    
-                    cleaned_text = raw_text
-                    if "<svg" in cleaned_text and "</svg>" in cleaned_text:
-                        start_idx = cleaned_text.find("<svg")
-                        end_idx = cleaned_text.rfind("</svg>") + 6
-                        
-                        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                            blueprint_code = cleaned_text[start_idx:end_idx]
-                            blueprint_code = blueprint_code.replace("```xml", "").replace("```html", "").replace("```", "").strip()
-                            result_text = cleaned_text[:start_idx].strip() + "\n\n[✅ تم توليد واستخراج المخطط الهندسي المرئي بنجاح تام]\n\n" + cleaned_text[end_idx:].strip()
-                    
-                    if not result_text:
-                        result_text = raw_text
-                    
-                    success = True
-                    break
-        except urllib.error.HTTPError as e:
-            error_message = e.read().decode('utf-8', errors='ignore')
-            result_text = f"⚠ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. التفاصيل: {error_message[:150]}"
-            continue
-        except Exception:
-            continue
-
-    if not success and not result_text:
-        result_text = "⚠ خطأ API: تعذر الاتصال بجميع النماذج المتاحة. تأكد من صحة مفتاح الـ API الخاص بك."
+                    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                        blueprint_code = cleaned_text[start_idx:end_idx]
+                        blueprint_code = blueprint_code.replace("```xml", "").replace("```html", "").replace("```", "").strip()
+                        result_text = cleaned_text[:start_idx].strip() + "\n\n[✅ تم توليد واستخراج المخطط الهندسي المرئي بنجاح تام]\n\n" + cleaned_text[end_idx:].strip()
+                
+                if not result_text:
+                    result_text = raw_text
+            else:
+                result_text = f"⚠️ خطأ من الخادم برمز الاستجابة: {response.status}"
+    except urllib.error.HTTPError as e:
+        error_message = e.read().decode('utf-8', errors='ignore')
+        result_text = f"⚠️️ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. تفاصيل الخطأ: {error_message[:150]}"
+    except urllib.error.URLError as e:
+        result_text = f"⚠️ خطأ في الشبكة العالمية أو تعذر الوصول للخادم."
+    except Exception as e:
+        result_text = f"⚠ حدث خطأ داخلي في النواة: {str(e)}"
 
     return result_text, blueprint_code
 
@@ -166,9 +167,13 @@ def dashboard():
         if user_api_key:
             session['saved_api_key'] = user_api_key 
 
+        content, blueprint = "", ""
         if query:
             content, blueprint = generate_ai_response(req_type, query, user_api_key)
-            persist_to_db(session['session_id'], req_type, query, content, blueprint)
+            item_data = persist_to_db(session['session_id'], req_type, query, content, blueprint)
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or (request.content_type and 'application/json' in request.content_type):
+                return jsonify({"status": "success", "item": item_data})
             
         return redirect(url_for('dashboard'))
 
@@ -207,10 +212,10 @@ def dashboard():
             .input-wrapper input { flex: 1; padding: 14px; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; }
             
             .toggle-view-btn { background: transparent; border: none; color: var(--accent-blue); padding: 0 15px; cursor: pointer; font-size: 14px; font-weight: bold; }
-            .toggle-view-btn:hover { opacity: 0.8; }
+            .toggle-view-btn:hover { opacity: 0.8; transform: none; }
 
-            input[type="text"], input[type="password"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
-            input[type="text"]:focus, input[type="password"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+            input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
+            input[type="text"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
             
             .btn-group { display: flex; gap: 12px; }
             button { flex: 1; padding: 14px; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: all 0.2s; }
@@ -226,20 +231,9 @@ def dashboard():
             .tag { background: var(--accent-blue); color: white; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
             #sys-status { font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 14px; color: var(--accent-green); background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2); }
             #status-mic { font-weight: bold; text-align: center; margin-bottom: 10px; font-size: 13px; color: #f87171; }
-            
-            /* شاشة الانتظار عند إرسال الطلب */
-            #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(9, 13, 22, 0.85); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; color: #60a5fa; font-size: 18px; font-weight: bold; }
-            .spinner { border: 5px solid #1f2937; border-top: 5px solid #3b82f6; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         </style>
     </head>
     <body>
-        <!-- شاشة التحميل لمنع حذف النص ولإظهار حالة المعالجة -->
-        <div id="loading-overlay">
-            <div class="spinner"></div>
-            <div>⏳ جاري معالجة الطلب عبر النواة الذكية، يرجى الانتظار لحظات...</div>
-        </div>
-
         <div class="container">
             <header>
                 <h1>💎🧠 النواة الماسية العالمية المتقدمة</h1>
@@ -250,11 +244,10 @@ def dashboard():
             
             <div class="card">
                 <h3>🛠 لوحة التحكم والعمليات المتقدمة</h3>
-                <form method="POST" action="/" id="ai-form" onsubmit="handleFormSubmit(event)">
+                <div id="ai-form">
                     <label><b>🔑 مفتاح الـ API:</b></label>
                     <div class="input-wrapper">
-                        <!-- تم تغيير نوع الحقل إلى password افتراضياً ليتم حجبه تماماً -->
-                        <input type="password" name="gemini_token_x" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
+                        <input type="text" name="gemini_token_x" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
                         <button type="button" class="toggle-view-btn" onclick="maskApiKeyToggle()">👁️ إخفاء/إظهار</button>
                     </div>
 
@@ -273,9 +266,9 @@ def dashboard():
 
                     <div class="btn-group">
                         <button type="button" class="mic-btn" onclick="startVoiceRecognition()">🎤 إدخال صوتي</button>
-                        <button type="submit" id="submit-btn">🚀 تشغيل المعالجة فائقة السرعة</button>
+                        <button type="button" id="submit-btn" onclick="executeAjaxSubmit()">🚀 تشغيل المعالجة فائقة السرعة</button>
                     </div>
-                </form>
+                </div>
             </div>
 
             <div class="card">
@@ -310,27 +303,106 @@ def dashboard():
         </div>
 
         <script>
-            // إصلاح زر إخفاء/إظهار كلمة السر بشكل تام عبر تغيير نوع الحقل
+            let isMasked = false;
             function maskApiKeyToggle() {
                 const input = document.getElementById('api-key-input');
-                if (input.type === 'password') {
-                    input.type = 'text';
+                isMasked = !isMasked;
+                if (isMasked) {
+                    input.style.webkitTextSecurity = 'disc';
                 } else {
-                    input.type = 'password';
+                    input.style.webkitTextSecurity = 'none';
                 }
             }
 
-            // إظهار شاشة الانتظار ومنع مسع النص العشوائي أثناء الإرسال
-            function handleFormSubmit(event) {
+            function executeAjaxSubmit() {
+                const apiKeyInput = document.getElementById('api-key-input');
+                const reqTypeSelect = document.getElementById('req-type-select');
                 const queryInput = document.getElementById('query-input');
-                if (!queryInput.value.trim()) {
-                    event.preventDefault();
+                const btn = document.getElementById('submit-btn');
+                const sysStatus = document.getElementById('sys-status');
+                
+                const queryVal = queryInput.value.trim();
+                if(!queryVal) {
                     alert("يرجى إدخال السؤال أو الطلب أولاً.");
                     queryInput.focus();
                     return;
                 }
-                // إظهار نافذة التحميل الشفافة
-                document.getElementById('loading-overlay').style.display = 'flex';
+
+                const formData = new FormData();
+                formData.append('gemini_token_x', apiKeyInput.value.trim());
+                formData.append('req_type', reqTypeSelect.value);
+                formData.append('query', queryVal);
+                
+                btn.disabled = true;
+                btn.innerText = "⏳ جاري إرسال الطلب والمعالجة...";
+                sysStatus.innerText = "⏳ النظام يعمل بأقصى طاقة، يرجى الانتظار...";
+
+                fetch('/', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
+                    sysStatus.innerText = "🟢 النظام العالمي متصل، مؤمن، ومستعد للعمل بالسرعة القصوى";
+
+                    if(data.status === "success") {
+                        const item = data.item;
+                        const container = document.getElementById('registry-container');
+                        const noMsg = document.getElementById('no-registry-msg');
+                        if(noMsg) noMsg.remove();
+
+                        let blueprintHTML = '';
+                        if(item.blueprint) {
+                            blueprintHTML = `
+                                <div class="blueprint-container" id="svg-box-${item.id}">
+                                    <p style="color: #1f2937; font-size: 13px; margin-bottom: 5px; font-weight: bold;"><b>📊 المخطط الهندسي / الرسم المرئي:</b></p>
+                                    ${item.blueprint}
+                                </div>
+                                <button class="svg-download-btn" type="button" onclick="downloadSVG('svg-box-${item.id}', ${item.id})">📥 تنزيل المخطط حصرياً كملف SVG جاهز</button>
+                            `;
+                        }
+
+                        const newItemHTML = `
+                            <div class="history-item" id="history-item-${item.id}" style="opacity: 0; transition: opacity 0.5s ease;">
+                                <span class="tag">${item.type}</span> <b style="color: var(--text-muted);">[${item.time}]</b>
+                                <p><b>الطلب:</b> ${escapeHtml(item.query)}</p>
+                                <div class="output-box">${escapeHtml(item.content)}</div>
+                                ${blueprintHTML}
+                                <button class="speak-btn" type="button" onclick="speakTextFromElement('history-item-${item.id}')">🗣 الاستماع للتقرير صوتياً</button>
+                                <a href="/export/${item.id}" target="_blank">
+                                    <button class="export-btn" type="button">📥 تصدير التقرير النصي الكامل (TXT)</button>
+                                </a>
+                            </div>
+                        `;
+
+                        container.insertAdjacentHTML('afterbegin', newItemHTML);
+                        setTimeout(() => {
+                            document.getElementById(`history-item-${item.id}`).style.opacity = '1';
+                        }, 50);
+
+                        queryInput.value = '';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    btn.disabled = false;
+                    btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
+                    sysStatus.innerText = "⚠ حدث خطأ أثناء الاتصال بالخادم.";
+                });
+            }
+
+            function escapeHtml(text) {
+                return text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
             }
 
             function startVoiceRecognition() {
@@ -371,7 +443,7 @@ def dashboard():
                     source = source.replace(/^<svg/, '<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"');
                 }
                 if(!source.match(/^<\?xml/)){
-                    source = '<?xml version="1.0" encoding="utf-8"?>\r\n' + source;
+                    source = '<?xml version="1.0" encoding="utf-8"?>\\r\\n' + source;
                 }
                 const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
                 const url = URL.createObjectURL(blob);
@@ -402,13 +474,13 @@ def export_item(item_id):
         return "العنصر المطلوب غير موجود أو انتهت صلاحية الجلسة", 404
     
     filename = f"diamond_global_report_{item_id}.txt"
-    file_content = f"========================================\n" \
-                   f"💎 تقرير النواة الماسية العالمية المتقدمة\n" \
-                   f"========================================\n" \
-                   f"نوع الطلب: {target_item['type']}\n" \
-                   f"وقت التوليد: {target_item['time']}\n" \
-                   f"نص الاستعلام: {target_item['query']}\n\n" \
-                   f"النتيجة والتحليل التقني:\n{target_item['content']}\n"
+    file_content = f"========================================\\n" \
+                   f"💎 تقرير النواة الماسية العالمية المتقدمة\\n" \
+                   f"========================================\\n" \
+                   f"نوع الطلب: {target_item['type']}\\n" \
+                   f"وقت التوليد: {target_item['time']}\\n" \
+                   f"نص الاستعلام: {target_item['query']}\\n\\n" \
+                   f"النتيجة والتحليل التقني:\\n{target_item['content']}\\n"
     
     filepath = os.path.join(BASE_DIR, filename)
     with open(filepath, "w", encoding="utf-8") as f:
