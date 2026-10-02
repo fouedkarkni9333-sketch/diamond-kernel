@@ -6,7 +6,7 @@ import urllib.error
 import ssl
 from datetime import datetime
 
-# تخطي فحص شهادات الأمان لتجنب تعليق الاتصال
+# تخطي فحص شهادات الأمان لتجنب أي تعليق في الاتصال
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
@@ -109,8 +109,8 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
         return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
 
     try:
-        # استخدام نموذج gemini-1.5-flash عبر واجهة v1 المعتمدة لضمان عدم حدوث خطأ 404
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+        # استخدام الإصدار v1beta مع نموذج gemini-2.5-flash المتوافق تماماً مع الاتصالات الحالية
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
@@ -146,7 +146,7 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
                 result_text = f"⚠️ خطأ من الخادم برمز الاستجابة: {response.status}"
     except urllib.error.HTTPError as e:
         error_message = e.read().decode('utf-8', errors='ignore')
-        result_text = f"⚠️️ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. تفاصيل الخطأ: {error_message[:150]}"
+        result_text = f"⚠ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. التفاصيل: {error_message[:150]}"
     except urllib.error.URLError as e:
         result_text = f"⚠️ خطأ في الشبكة العالمية أو تعذر الوصول للخادم."
     except Exception as e:
