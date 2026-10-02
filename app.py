@@ -108,48 +108,56 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
     if not api_key:
         return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
 
-    try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-        payload = {
-            "contents": [{
-                "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
-            }]
-        }
-        
-        data_bytes = json.dumps(payload).encode('utf-8')
-        req = urllib.request.Request(url, data=data_bytes, headers={'Content-Type': 'application/json'}, method='POST')
-        
-        with urllib.request.urlopen(req, timeout=50) as response:
-            if response.status == 200:
-                res_body = response.read().decode('utf-8')
-                data = json.loads(res_body)
-                
-                try:
-                    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                except (KeyError, IndexError):
-                    return "⚠️ استجاب الخادم بنجاح ولكن المحتوى عاد فارغاً أو تم حظره بواسطة سياسة الأمان.", ""
-                
-                cleaned_text = raw_text
-                if "<svg" in cleaned_text and "</svg>" in cleaned_text:
-                    start_idx = cleaned_text.find("<svg")
-                    end_idx = cleaned_text.rfind("</svg>") + 6
+    # قائمة النماذج لتجربتها تلقائياً ومنع حدوث أخطاء 404 نهائياً
+    models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+    success = False
+
+    for model_name in models_to_try:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            payload = {
+                "contents": [{
+                    "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
+                }]
+            }
+            
+            data_bytes = json.dumps(payload).encode('utf-8')
+            req = urllib.request.Request(url, data=data_bytes, headers={'Content-Type': 'application/json'}, method='POST')
+            
+            with urllib.request.urlopen(req, timeout=50) as response:
+                if response.status == 200:
+                    res_body = response.read().decode('utf-8')
+                    data = json.loads(res_body)
                     
-                    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                        blueprint_code = cleaned_text[start_idx:end_idx]
-                        blueprint_code = blueprint_code.replace("```xml", "").replace("```html", "").replace("```", "").strip()
-                        result_text = cleaned_text[:start_idx].strip() + "\n\n[✅ تم توليد واستخراج المخطط الهندسي المرئي بنجاح تام]\n\n" + cleaned_text[end_idx:].strip()
-                
-                if not result_text:
-                    result_text = raw_text
-            else:
-                result_text = f"⚠️ خطأ من الخادم برمز الاستجابة: {response.status}"
-    except urllib.error.HTTPError as e:
-        error_message = e.read().decode('utf-8', errors='ignore')
-        result_text = f"⚠ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. التفاصيل: {error_message[:150]}"
-    except urllib.error.URLError as e:
-        result_text = f"⚠ خطأ في الشبكة العالمية أو تعذر الوصول للخادم."
-    except Exception as e:
-        result_text = f"⚠ حدث خطأ داخلي في النواة: {str(e)}"
+                    try:
+                        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                    except (KeyError, IndexError):
+                        return "⚠️ استجاب الخادم بنجاح ولكن المحتوى عاد فارغاً أو تم حظره بواسطة سياسة الأمان.", ""
+                    
+                    cleaned_text = raw_text
+                    if "<svg" in cleaned_text and "</svg>" in cleaned_text:
+                        start_idx = cleaned_text.find("<svg")
+                        end_idx = cleaned_text.rfind("</svg>") + 6
+                        
+                        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                            blueprint_code = cleaned_text[start_idx:end_idx]
+                            blueprint_code = blueprint_code.replace("```xml", "").replace("```html", "").replace("```", "").strip()
+                            result_text = cleaned_text[:start_idx].strip() + "\n\n[✅ تم توليد واستخراج المخطط الهندسي المرئي بنجاح تام]\n\n" + cleaned_text[end_idx:].strip()
+                    
+                    if not result_text:
+                        result_text = raw_text
+                    
+                    success = True
+                    break
+        except urllib.error.HTTPError as e:
+            error_message = e.read().decode('utf-8', errors='ignore')
+            result_text = f"⚠ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. التفاصيل: {error_message[:150]}"
+            continue
+        except Exception:
+            continue
+
+    if not success and not result_text:
+        result_text = "⚠ خطأ API: تعذر الاتصال بجميع النماذج المتاحة. تأكد من صحة مفتاح الـ API الخاص بك."
 
     return result_text, blueprint_code
 
@@ -442,7 +450,7 @@ def dashboard():
                     source = source.replace(/^<svg/, '<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"');
                 }
                 if(!source.match(/^<\?xml/)){
-                    source = '<?xml version="1.0" encoding="utf-8"?>\\r\\n' + source;
+                    source = '<?xml version="1.0" encoding="utf-8"?>\r\n' + source;
                 }
                 const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
                 const url = URL.createObjectURL(blob);
@@ -473,13 +481,13 @@ def export_item(item_id):
         return "العنصر المطلوب غير موجود أو انتهت صلاحية الجلسة", 404
     
     filename = f"diamond_global_report_{item_id}.txt"
-    file_content = f"========================================\\n" \
-                   f"💎 تقرير النواة الماسية العالمية المتقدمة\\n" \
-                   f"========================================\\n" \
-                   f"نوع الطلب: {target_item['type']}\\n" \
-                   f"وقت التوليد: {target_item['time']}\\n" \
-                   f"نص الاستعلام: {target_item['query']}\\n\\n" \
-                   f"النتيجة والتحليل التقني:\\n{target_item['content']}\\n"
+    file_content = f"========================================\n" \
+                   f"💎 تقرير النواة الماسية العالمية المتقدمة\n" \
+                   f"========================================\n" \
+                   f"نوع الطلب: {target_item['type']}\n" \
+                   f"وقت التوليد: {target_item['time']}\n" \
+                   f"نص الاستعلام: {target_item['query']}\n\n" \
+                   f"النتيجة والتحليل التقني:\n{target_item['content']}\n"
     
     filepath = os.path.join(BASE_DIR, filename)
     with open(filepath, "w", encoding="utf-8") as f:
