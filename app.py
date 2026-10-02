@@ -143,7 +143,7 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
                 if not result_text:
                     result_text = raw_text
             else:
-                result_text = f"⚠️️ خطأ من الخادم برمز الاستجابة: {response.status}"
+                result_text = f"⚠️ خطأ من الخادم برمز الاستجابة: {response.status}"
     except urllib.error.HTTPError as e:
         result_text = f"⚠️ خطأ API (رمز {e.code}): تحقق من صحة مفتاح الـ API."
     except urllib.error.URLError as e:
@@ -159,7 +159,8 @@ def dashboard():
         session['session_id'] = os.urandom(16).hex()
     
     if request.method == 'POST':
-        user_api_key = request.form.get("api_key", "").strip()
+        # استخدام الاسم الجديد الخفي للحقل لتجاوز نظام كلمات المرور في كروم
+        user_api_key = request.form.get("gemini_token_x", "").strip()
         req_type = request.form.get("req_type", "research")
         query = request.form.get("query", "").strip()
         
@@ -206,7 +207,7 @@ def dashboard():
             .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
             label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #d1d5db; }
             input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
-            /* إخفاء الكلمات برمجيياً لمنع متصفح كروم من اعتبار الحقل كلمة مرور وتوليد رسالة الحفظ */
+            /* إخفاء النقاط للحفاظ على الأمان البصري دون أي ارتباط بنظام كلمات المرور */
             .secure-text-input { -webkit-text-security: disc; }
             input[type="text"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
             .btn-group { display: flex; gap: 12px; }
@@ -236,10 +237,10 @@ def dashboard():
             
             <div class="card">
                 <h3>🛠 لوحة التحكم والعمليات المتقدمة</h3>
-                <!-- حقل الـ API أصبح من نوع text مع منع الحفظ تماماً لمنع ظهور نافذة كروم الرمادية -->
                 <div id="ai-form">
+                    <!-- اسم حقل عشوائي وغير حساس لمنع متصفح كروم من تفعيل مدير كلمات المرور -->
                     <label><b>🔑 مفتاح الـ API:</b></label>
-                    <input type="text" name="api_key" id="api-key-input" class="secure-text-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
+                    <input type="text" name="gemini_token_x" id="api-key-input" class="secure-text-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
 
                     <label><b>اختر نمط التشغيل المتقدم:</b></label>
                     <select name="req_type" id="req-type-select">
@@ -308,7 +309,7 @@ def dashboard():
                 }
 
                 const formData = new FormData();
-                formData.append('api_key', apiKeyInput.value.trim());
+                formData.append('gemini_token_x', apiKeyInput.value.trim());
                 formData.append('req_type', reqTypeSelect.value);
                 formData.append('query', queryVal);
                 
@@ -364,7 +365,6 @@ def dashboard():
                             document.getElementById(`history-item-${item.id}`).style.opacity = '1';
                         }, 50);
 
-                        // مسح خانة الطلب فقط مع الاحتفاظ بمفتاح الـ API
                         queryInput.value = '';
                     }
                 })
