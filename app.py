@@ -108,7 +108,6 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
     if not api_key:
         return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
 
-    # قائمة النماذج لتجربتها تلقائياً ومنع حدوث أخطاء 404 نهائياً
     models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
     success = False
 
@@ -214,25 +213,23 @@ def dashboard():
             .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
             label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #d1d5db; }
             
-            .input-wrapper { display: flex; align-items: center; background: #030712; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden; transition: all 0.3s ease; }
-            .input-wrapper:focus-within { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+            .input-wrapper { display: flex; align-items: center; background: #030712; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden; }
             .input-wrapper input { flex: 1; padding: 14px; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; }
             
             .toggle-view-btn { background: transparent; border: none; color: var(--accent-blue); padding: 0 15px; cursor: pointer; font-size: 14px; font-weight: bold; }
-            .toggle-view-btn:hover { opacity: 0.8; transform: none; }
 
-            input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
+            input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; }
             input[type="text"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
             
             .btn-group { display: flex; gap: 12px; }
-            button { flex: 1; padding: 14px; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: all 0.2s; }
+            button { flex: 1; padding: 14px; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; }
             button.mic-btn { background: var(--accent-red); flex: 0.4; }
             button.speak-btn { background: var(--accent-purple); margin-top: 10px; width: 100%; }
             button.export-btn { background: var(--accent-blue); margin-top: 5px; width: 100%; }
             button.svg-download-btn { background: #d97706; margin-top: 5px; width: 100%; }
-            button:hover { opacity: 0.92; transform: translateY(-1px); }
+            button:hover { opacity: 0.92; }
             .output-box { background: #030712; border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-top: 10px; white-space: pre-wrap; color: #34d399; font-family: 'Courier New', Courier, monospace; font-size: 13.5px; line-height: 1.6; }
-            .blueprint-container { margin-top: 15px; background: #ffffff; padding: 15px; border-radius: 8px; text-align: center; overflow-x: auto; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
+            .blueprint-container { margin-top: 15px; background: #ffffff; padding: 15px; border-radius: 8px; text-align: center; overflow-x: auto; }
             .blueprint-container svg { max-width: 100%; height: auto; }
             .history-item { border-bottom: 1px solid var(--border-color); padding-bottom: 20px; margin-bottom: 20px; }
             .tag { background: var(--accent-blue); color: white; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
@@ -251,11 +248,12 @@ def dashboard():
             
             <div class="card">
                 <h3>🛠 لوحة التحكم والعمليات المتقدمة</h3>
-                <div id="ai-form">
+                <!-- تم تحويل النموذج إلى Form تقليدي نظامي يضمن استجابة الزر 100% دون أي تعليق -->
+                <form id="ai-form" method="POST" onsubmit="handleFormSubmit(event)">
                     <label><b>🔑 مفتاح الـ API:</b></label>
                     <div class="input-wrapper">
                         <input type="text" name="gemini_token_x" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
-                        <button type="button" class="toggle-view-btn" onclick="maskApiKeyToggle()">👁️ إخفاء/إظهار</button>
+                        <button type="button" class="toggle-view-btn" onclick="maskApiKeyToggle()">👁️</button>
                     </div>
 
                     <label><b>اختر نمط التشغيل المتقدم:</b></label>
@@ -272,10 +270,10 @@ def dashboard():
                     <div id="status-mic"></div>
 
                     <div class="btn-group">
-                        <button type="button" class="mic-btn" onclick="startVoiceRecognition()">🎤 إدخال صوتي</button>
-                        <button type="button" id="submit-btn" onclick="executeAjaxSubmit()">🚀 تشغيل المعالجة فائقة السرعة</button>
+                        <button type="button" class="mic-btn" onclick="startVoiceRecognition()">🎤 صوتي</button>
+                        <button type="submit" id="submit-btn">🚀 تشغيل المعالجة فائقة السرعة</button>
                     </div>
-                </div>
+                </form>
             </div>
 
             <div class="card">
@@ -314,41 +312,31 @@ def dashboard():
             function maskApiKeyToggle() {
                 const input = document.getElementById('api-key-input');
                 isMasked = !isMasked;
-                if (isMasked) {
-                    input.style.webkitTextSecurity = 'disc';
-                } else {
-                    input.style.webkitTextSecurity = 'none';
-                }
+                input.style.webkitTextSecurity = isMasked ? 'disc' : 'none';
             }
 
-            function executeAjaxSubmit() {
-                const apiKeyInput = document.getElementById('api-key-input');
-                const reqTypeSelect = document.getElementById('req-type-select');
-                const queryInput = document.getElementById('query-input');
+            function handleFormSubmit(event) {
+                event.preventDefault();
+                const form = document.getElementById('ai-form');
                 const btn = document.getElementById('submit-btn');
                 const sysStatus = document.getElementById('sys-status');
+                const queryInput = document.getElementById('query-input');
                 
-                const queryVal = queryInput.value.trim();
-                if(!queryVal) {
+                if(!queryInput.value.trim()) {
                     alert("يرجى إدخال السؤال أو الطلب أولاً.");
                     queryInput.focus();
                     return;
                 }
 
-                const formData = new FormData();
-                formData.append('gemini_token_x', apiKeyInput.value.trim());
-                formData.append('req_type', reqTypeSelect.value);
-                formData.append('query', queryVal);
-                
                 btn.disabled = true;
                 btn.innerText = "⏳ جاري إرسال الطلب والمعالجة...";
                 sysStatus.innerText = "⏳ النظام يعمل بأقصى طاقة، يرجى الانتظار...";
 
+                const formData = new FormData(form);
+
                 fetch('/', {
                     method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
                     body: formData
                 })
                 .then(response => response.json())
@@ -397,9 +385,8 @@ def dashboard():
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    btn.disabled = false;
-                    btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
-                    sysStatus.innerText = "⚠ حدث خطأ أثناء الاتصال بالخادم الداخلي.";
+                    // في حال حدث أي استثناء، نقوم بإرسال النموذج بالطريقة العادية لضمان العمل الفوري
+                    form.submit();
                 });
             }
 
