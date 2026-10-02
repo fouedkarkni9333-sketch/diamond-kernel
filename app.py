@@ -15,7 +15,7 @@ else:
     ssl._create_default_https_context = _create_unverified_https_context
 
 try:
-    from flask import Flask, render_template_string, request, redirect, url_for, send_file, session
+    from flask import Flask, render_template_string, request, redirect, url_for, send_file, session, jsonify
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -104,8 +104,6 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
     }
     
     sys_prompt = system_instructions.get(req_type, "أنت مساعد ذكي وعالمي متخصص.")
-    
-    # التقاط المفتاح بدقة من الواجهة أو من إعدادات البيئة
     api_key = user_api_key.strip() if user_api_key else os.environ.get("GEMINI_API_KEY", "").strip()
 
     if not api_key:
@@ -121,8 +119,6 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
         
         data_bytes = json.dumps(payload).encode('utf-8')
         req = urllib.request.Request(url, data=data_bytes, headers={'Content-Type': 'application/json'}, method='POST')
-        
-        print(f"--- 🚀 جاري الاتصال الفائق بخوادم جوجل للنوع: {req_type} ---")
         
         with urllib.request.urlopen(req, timeout=50) as response:
             if response.status == 200:
@@ -146,18 +142,13 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
                 
                 if not result_text:
                     result_text = raw_text
-                print("--- ✅ تم استلام ومعالجة الرد بنجاح ---")
             else:
-                result_text = f"⚠️ خطأ من الخادم برمز الاستجابة: {response.status}"
+                result_text = f"⚠️️ خطأ من الخادم برمز الاستجابة: {response.status}"
     except urllib.error.HTTPError as e:
-        err_msg = e.read().decode('utf-8', errors='ignore')
-        print(f"❌ HTTP Error: {err_msg}")
-        result_text = f"⚠️ خطأ API (رمز {e.code}): تحقق من صحة مفتاح الـ API الرصيدي."
+        result_text = f"⚠️ خطأ API (رمز {e.code}): تحقق من صحة مفتاح الـ API."
     except urllib.error.URLError as e:
-        print(f"❌ URL Error: {e.reason}")
-        result_text = f"⚠️ خطأ في الشبكة العالمية: تحقق من اتصال الإنترنت لديك."
+        result_text = f"⚠️ خطأ في الشبكة العالمية."
     except Exception as e:
-        print(f"❌ General AI Error: {str(e)}")
         result_text = f"⚠ حدث خطأ داخلي في النواة: {str(e)}"
 
     return result_text, blueprint_code
@@ -175,9 +166,13 @@ def dashboard():
         if user_api_key:
             session['saved_api_key'] = user_api_key 
 
+        content, blueprint = "", ""
         if query:
             content, blueprint = generate_ai_response(req_type, query, user_api_key)
-            persist_to_db(session['session_id'], req_type, query, content, blueprint)
+            item_data = persist_to_db(session['session_id'], req_type, query, content, blueprint)
+            
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or (request.content_type and 'application/json' in request.content_type):
+                return jsonify({"status": "success", "item": item_data})
             
         return redirect(url_for('dashboard'))
 
@@ -210,8 +205,10 @@ def dashboard():
             p.sub-title { color: var(--text-muted); font-size: 14px; margin: 0; }
             .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
             label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #d1d5db; }
-            input[type="text"], input[type="password"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
-            input[type="text"]:focus, input[type="password"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+            input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
+            /* إخفاء الكلمات برمجيياً لمنع متصفح كروم من اعتبار الحقل كلمة مرور وتوليد رسالة الحفظ */
+            .secure-text-input { -webkit-text-security: disc; }
+            input[type="text"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
             .btn-group { display: flex; gap: 12px; }
             button { flex: 1; padding: 14px; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: all 0.2s; }
             button.mic-btn { background: var(--accent-red); flex: 0.4; }
@@ -239,12 +236,13 @@ def dashboard():
             
             <div class="card">
                 <h3>🛠 لوحة التحكم والعمليات المتقدمة</h3>
-                <form method="POST" onsubmit="showLoading(this)">
-                    <label><b>🔑 مفتاح الـ API (اختياري إذا كان الخادم محمل مسبقاً):</b></label>
-                    <input type="password" name="api_key" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا (اتركه فارغاً إذا وُجد في النظام)..." autocomplete="off">
+                <!-- حقل الـ API أصبح من نوع text مع منع الحفظ تماماً لمنع ظهور نافذة كروم الرمادية -->
+                <div id="ai-form">
+                    <label><b>🔑 مفتاح الـ API:</b></label>
+                    <input type="text" name="api_key" id="api-key-input" class="secure-text-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
 
                     <label><b>اختر نمط التشغيل المتقدم:</b></label>
-                    <select name="req_type">
+                    <select name="req_type" id="req-type-select">
                         <option value="blueprint">📐 مخطط هندسي ومعماري ذكي متقدم (SVG)</option>
                         <option value="image">🎨 تصميم بصري ورسومات هندسية دقيقة (SVG)</option>
                         <option value="research">📚 تحليل وبحث استراتيجي وعميق</option>
@@ -258,9 +256,9 @@ def dashboard():
 
                     <div class="btn-group">
                         <button type="button" class="mic-btn" onclick="startVoiceRecognition()">🎤 إدخال صوتي</button>
-                        <button type="submit" id="submit-btn">🚀 تشغيل المعالجة فائقة السرعة</button>
+                        <button type="button" id="submit-btn" onclick="executeAjaxSubmit()">🚀 تشغيل المعالجة فائقة السرعة</button>
                     </div>
-                </form>
+                </div>
             </div>
 
             <div class="card">
@@ -268,7 +266,7 @@ def dashboard():
                 <div id="registry-container">
                     {% if registry %}
                         {% for item in registry %}
-                            <div class="history-item">
+                            <div class="history-item" id="history-item-{{ item.id }}">
                                 <span class="tag">{{ item.type }}</span> <b style="color: var(--text-muted);">[{{ item.time }}]</b>
                                 <p><b>الطلب:</b> {{ item.query }}</p>
                                 <div class="output-box">{{ item.content }}</div>
@@ -281,30 +279,115 @@ def dashboard():
                                     <button class="svg-download-btn" type="button" onclick="downloadSVG('svg-box-{{ item.id }}', {{ item.id }})">📥 تنزيل المخطط حصرياً كملف SVG جاهز</button>
                                 {% endif %}
                                 
-                                <button class="speak-btn" type="button" onclick="speakText('{{ item.content | replace("'", "") | replace('"', '') | replace("\n", " ") }}')">🗣 الاستماع للتقرير صوتياً</button>
+                                <button class="speak-btn" type="button" onclick="speakTextFromElement('history-item-{{ item.id }}')">🗣 الاستماع للتقرير صوتياً</button>
                                 <a href="/export/{{ item.id }}" target="_blank">
                                     <button class="export-btn" type="button">📥 تصدير التقرير النصي الكامل (TXT)</button>
                                 </a>
                             </div>
                         {% endfor %}
                     {% else %}
-                        <p style="color: var(--text-muted); text-align: center; padding: 20px;">لا توجد مخرجات مسجلة في هذه الجلسة بعد. ابدأ بإدخال طلبك بالأعلى!</p>
+                        <p id="no-registry-msg" style="color: var(--text-muted); text-align: center; padding: 20px;">لا توجد مخرجات مسجلة في هذه الجلسة بعد. ابدأ بإدخال طلبك بالأعلى!</p>
                     {% endif %}
                 </div>
             </div>
         </div>
 
         <script>
-            function showLoading(form) {
+            function executeAjaxSubmit() {
+                const apiKeyInput = document.getElementById('api-key-input');
+                const reqTypeSelect = document.getElementById('req-type-select');
+                const queryInput = document.getElementById('query-input');
                 const btn = document.getElementById('submit-btn');
+                const sysStatus = document.getElementById('sys-status');
+                
+                const queryVal = queryInput.value.trim();
+                if(!queryVal) {
+                    alert("يرجى إدخال السؤال أو الطلب أولاً.");
+                    queryInput.focus();
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('api_key', apiKeyInput.value.trim());
+                formData.append('req_type', reqTypeSelect.value);
+                formData.append('query', queryVal);
+                
                 btn.disabled = true;
-                btn.innerText = "⏳ جاري إرسال الطلب والمعالجة عبر خوادم الذكاء الاصطناعي...";
-                document.getElementById('sys-status').innerText = "⏳ النظام يعمل بأقصى طاقة، يرجى الانتظار لحظات...";
+                btn.innerText = "⏳ جاري إرسال الطلب والمعالجة...";
+                sysStatus.innerText = "⏳ النظام يعمل بأقصى طاقة، يرجى الانتظار...";
+
+                fetch('/', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    btn.disabled = false;
+                    btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
+                    sysStatus.innerText = "🟢 النظام العالمي متصل، مؤمن، ومستعد للعمل بالسرعة القصوى";
+
+                    if(data.status === "success") {
+                        const item = data.item;
+                        const container = document.getElementById('registry-container');
+                        const noMsg = document.getElementById('no-registry-msg');
+                        if(noMsg) noMsg.remove();
+
+                        let blueprintHTML = '';
+                        if(item.blueprint) {
+                            blueprintHTML = `
+                                <div class="blueprint-container" id="svg-box-${item.id}">
+                                    <p style="color: #1f2937; font-size: 13px; margin-bottom: 5px; font-weight: bold;"><b>📊 المخطط الهندسي / الرسم المرئي:</b></p>
+                                    ${item.blueprint}
+                                </div>
+                                <button class="svg-download-btn" type="button" onclick="downloadSVG('svg-box-${item.id}', ${item.id})">📥 تنزيل المخطط حصرياً كملف SVG جاهز</button>
+                            `;
+                        }
+
+                        const newItemHTML = `
+                            <div class="history-item" id="history-item-${item.id}" style="opacity: 0; transition: opacity 0.5s ease;">
+                                <span class="tag">${item.type}</span> <b style="color: var(--text-muted);">[${item.time}]</b>
+                                <p><b>الطلب:</b> ${escapeHtml(item.query)}</p>
+                                <div class="output-box">${escapeHtml(item.content)}</div>
+                                ${blueprintHTML}
+                                <button class="speak-btn" type="button" onclick="speakTextFromElement('history-item-${item.id}')">🗣 الاستماع للتقرير صوتياً</button>
+                                <a href="/export/${item.id}" target="_blank">
+                                    <button class="export-btn" type="button">📥 تصدير التقرير النصي الكامل (TXT)</button>
+                                </a>
+                            </div>
+                        `;
+
+                        container.insertAdjacentHTML('afterbegin', newItemHTML);
+                        setTimeout(() => {
+                            document.getElementById(`history-item-${item.id}`).style.opacity = '1';
+                        }, 50);
+
+                        // مسح خانة الطلب فقط مع الاحتفاظ بمفتاح الـ API
+                        queryInput.value = '';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    btn.disabled = false;
+                    btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
+                    sysStatus.innerText = "⚠️ حدث خطأ أثناء الاتصال بالخادم.";
+                });
+            }
+
+            function escapeHtml(text) {
+                return text
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
             }
 
             function startVoiceRecognition() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) { alert("متصفحك لا يدعم التعرف على الصوت المباشر."); return; }
+                if (!SpeechRecognition) { alert("متصفحك لا يدعم التعرف على الصوت."); return; }
                 const recognition = new SpeechRecognition();
                 recognition.lang = 'ar-SA';
                 document.getElementById('status-mic').innerText = "🔴 جاري الاستماع لصوتك بتركيز...";
@@ -315,7 +398,11 @@ def dashboard():
                 recognition.start();
             }
 
-            function speakText(text) {
+            function speakTextFromElement(elementId) {
+                const el = document.getElementById(elementId);
+                const outputBox = el.querySelector('.output-box');
+                if(!outputBox) return;
+                const text = outputBox.innerText;
                 if (!('speechSynthesis' in window)) return;
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(text);
@@ -336,7 +423,7 @@ def dashboard():
                     source = source.replace(/^<svg/, '<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"');
                 }
                 if(!source.match(/^<\?xml/)){
-                    source = '<?xml version="1.0" encoding="utf-8"?>\r\n' + source;
+                    source = '<?xml version="1.0" encoding="utf-8"?>\\r\\n' + source;
                 }
                 const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
                 const url = URL.createObjectURL(blob);
@@ -367,13 +454,13 @@ def export_item(item_id):
         return "العنصر المطلوب غير موجود أو انتهت صلاحية الجلسة", 404
     
     filename = f"diamond_global_report_{item_id}.txt"
-    file_content = f"========================================\n" \
-                   f"💎 تقرير النواة الماسية العالمية المتقدمة\n" \
-                   f"========================================\n" \
-                   f"نوع الطلب: {target_item['type']}\n" \
-                   f"وقت التوليد: {target_item['time']}\n" \
-                   f"نص الاستعلام: {target_item['query']}\n\n" \
-                   f"النتيجة والتحليل التقني:\n{target_item['content']}\n"
+    file_content = f"========================================\\n" \
+                   f"💎 تقرير النواة الماسية العالمية المتقدمة\\n" \
+                   f"========================================\\n" \
+                   f"نوع الطلب: {target_item['type']}\\n" \
+                   f"وقت التوليد: {target_item['time']}\\n" \
+                   f"نص الاستعلام: {target_item['query']}\\n\\n" \
+                   f"النتيجة والتحليل التقني:\\n{target_item['content']}\\n"
     
     filepath = os.path.join(BASE_DIR, filename)
     with open(filepath, "w", encoding="utf-8") as f:
