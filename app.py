@@ -104,10 +104,12 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
     }
     
     sys_prompt = system_instructions.get(req_type, "أنت مساعد ذكي وعالمي متخصص.")
-    api_key = user_api_key.strip() if user_api_key else os.environ.get("GEMINI_API_KEY", "")
+    
+    # التقاط المفتاح بدقة من الواجهة أو من إعدادات البيئة
+    api_key = user_api_key.strip() if user_api_key else os.environ.get("GEMINI_API_KEY", "").strip()
 
     if not api_key:
-        return "⚠️ تنبيه عالمي: لم يتم العثور على مفتاح API نشط في النظام أو متغيرات البيئة. يرجى إدخال مفتاح Gemini الخاص بك.", ""
+        return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
 
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
@@ -122,11 +124,15 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
         
         print(f"--- 🚀 جاري الاتصال الفائق بخوادم جوجل للنوع: {req_type} ---")
         
-        with urllib.request.urlopen(req, timeout=40) as response:
+        with urllib.request.urlopen(req, timeout=50) as response:
             if response.status == 200:
                 res_body = response.read().decode('utf-8')
                 data = json.loads(res_body)
-                raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                
+                try:
+                    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                except (KeyError, IndexError):
+                    return "⚠️ استجاب الخادم بنجاح ولكن المحتوى عاد فارغاً أو تم حظره بواسطة سياسة الأمان.", ""
                 
                 cleaned_text = raw_text
                 if "<svg" in cleaned_text and "</svg>" in cleaned_text:
@@ -146,7 +152,7 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
     except urllib.error.HTTPError as e:
         err_msg = e.read().decode('utf-8', errors='ignore')
         print(f"❌ HTTP Error: {err_msg}")
-        result_text = f"⚠️ خطأ HTTP من الخادم ({e.code}): تحقق من صحة مفتاح الـ API الرصيدي."
+        result_text = f"⚠️ خطأ API (رمز {e.code}): تحقق من صحة مفتاح الـ API الرصيدي."
     except urllib.error.URLError as e:
         print(f"❌ URL Error: {e.reason}")
         result_text = f"⚠️ خطأ في الشبكة العالمية: تحقق من اتصال الإنترنت لديك."
