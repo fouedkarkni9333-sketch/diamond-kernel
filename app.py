@@ -108,55 +108,48 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
     if not api_key:
         return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
 
-    models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
-    success = False
-
-    for model_name in models_to_try:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-            payload = {
-                "contents": [{
-                    "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
-                }]
-            }
-            
-            data_bytes = json.dumps(payload).encode('utf-8')
-            req = urllib.request.Request(url, data=data_bytes, headers={'Content-Type': 'application/json'}, method='POST')
-            
-            with urllib.request.urlopen(req, timeout=50) as response:
-                if response.status == 200:
-                    res_body = response.read().decode('utf-8')
-                    data = json.loads(res_body)
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{
+                "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
+            }]
+        }
+        
+        data_bytes = json.dumps(payload).encode('utf-8')
+        req = urllib.request.Request(url, data=data_bytes, headers={'Content-Type': 'application/json'}, method='POST')
+        
+        with urllib.request.urlopen(req, timeout=50) as response:
+            if response.status == 200:
+                res_body = response.read().decode('utf-8')
+                data = json.loads(res_body)
+                
+                try:
+                    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                except (KeyError, IndexError):
+                    return "⚠️ استجاب الخادم بنجاح ولكن المحتوى عاد فارغاً أو تم حظره بواسطة سياسة الأمان.", ""
+                
+                cleaned_text = raw_text
+                if "<svg" in cleaned_text and "</svg>" in cleaned_text:
+                    start_idx = cleaned_text.find("<svg")
+                    end_idx = cleaned_text.rfind("</svg>") + 6
                     
-                    try:
-                        raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                    except (KeyError, IndexError):
-                        return "⚠️ استجاب الخادم بنجاح ولكن المحتوى عاد فارغاً أو تم حظره بواسطة سياسة الأمان.", ""
-                    
-                    cleaned_text = raw_text
-                    if "<svg" in cleaned_text and "</svg>" in cleaned_text:
-                        start_idx = cleaned_text.find("<svg")
-                        end_idx = cleaned_text.rfind("</svg>") + 6
-                        
-                        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                            blueprint_code = cleaned_text[start_idx:end_idx]
-                            blueprint_code = blueprint_code.replace("```xml", "").replace("```html", "").replace("```", "").strip()
-                            result_text = cleaned_text[:start_idx].strip() + "\n\n[✅ تم توليد واستخراج المخطط الهندسي المرئي بنجاح تام]\n\n" + cleaned_text[end_idx:].strip()
-                    
-                    if not result_text:
-                        result_text = raw_text
-                    
-                    success = True
-                    break
-        except urllib.error.HTTPError as e:
-            error_message = e.read().decode('utf-8', errors='ignore')
-            result_text = f"⚠ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. التفاصيل: {error_message[:150]}"
-            continue
-        except Exception:
-            continue
-
-    if not success and not result_text:
-        result_text = "⚠ خطأ API: تعذر الاتصال بجميع النماذج المتاحة. تأكد من صحة مفتاح الـ API الخاص بك."
+                    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                        blueprint_code = cleaned_text[start_idx:end_idx]
+                        blueprint_code = blueprint_code.replace("```xml", "").replace("```html", "").replace("```", "").strip()
+                        result_text = cleaned_text[:start_idx].strip() + "\n\n[✅ تم توليد واستخراج المخطط الهندسي المرئي بنجاح تام]\n\n" + cleaned_text[end_idx:].strip()
+                
+                if not result_text:
+                    result_text = raw_text
+            else:
+                result_text = f"⚠️ خطأ من الخادم برمز الاستجابة: {response.status}"
+    except urllib.error.HTTPError as e:
+        error_message = e.read().decode('utf-8', errors='ignore')
+        result_text = f"⚠ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. التفاصيل: {error_message[:150]}"
+    except urllib.error.URLError as e:
+        result_text = f"⚠ خطأ في الشبكة العالمية أو تعذر الوصول للخادم."
+    except Exception as e:
+        result_text = f"⚠ حدث خطأ داخلي في النواة: {str(e)}"
 
     return result_text, blueprint_code
 
@@ -213,23 +206,25 @@ def dashboard():
             .card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
             label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #d1d5db; }
             
-            .input-wrapper { display: flex; align-items: center; background: #030712; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden; }
+            .input-wrapper { display: flex; align-items: center; background: #030712; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 15px; overflow: hidden; transition: all 0.3s ease; }
+            .input-wrapper:focus-within { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
             .input-wrapper input { flex: 1; padding: 14px; background: transparent; border: none; color: #fff; font-size: 15px; outline: none; }
             
             .toggle-view-btn { background: transparent; border: none; color: var(--accent-blue); padding: 0 15px; cursor: pointer; font-size: 14px; font-weight: bold; }
+            .toggle-view-btn:hover { opacity: 0.8; transform: none; }
 
-            input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; }
+            input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
             input[type="text"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
             
             .btn-group { display: flex; gap: 12px; }
-            button { flex: 1; padding: 14px; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; }
+            button { flex: 1; padding: 14px; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: all 0.2s; }
             button.mic-btn { background: var(--accent-red); flex: 0.4; }
             button.speak-btn { background: var(--accent-purple); margin-top: 10px; width: 100%; }
             button.export-btn { background: var(--accent-blue); margin-top: 5px; width: 100%; }
             button.svg-download-btn { background: #d97706; margin-top: 5px; width: 100%; }
-            button:hover { opacity: 0.92; }
+            button:hover { opacity: 0.92; transform: translateY(-1px); }
             .output-box { background: #030712; border: 1px solid var(--border-color); padding: 15px; border-radius: 8px; margin-top: 10px; white-space: pre-wrap; color: #34d399; font-family: 'Courier New', Courier, monospace; font-size: 13.5px; line-height: 1.6; }
-            .blueprint-container { margin-top: 15px; background: #ffffff; padding: 15px; border-radius: 8px; text-align: center; overflow-x: auto; }
+            .blueprint-container { margin-top: 15px; background: #ffffff; padding: 15px; border-radius: 8px; text-align: center; overflow-x: auto; box-shadow: inset 0 2px 4px rgba(0,0,0,0.1); }
             .blueprint-container svg { max-width: 100%; height: auto; }
             .history-item { border-bottom: 1px solid var(--border-color); padding-bottom: 20px; margin-bottom: 20px; }
             .tag { background: var(--accent-blue); color: white; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
@@ -248,12 +243,11 @@ def dashboard():
             
             <div class="card">
                 <h3>🛠 لوحة التحكم والعمليات المتقدمة</h3>
-                <!-- تم تحويل النموذج إلى Form تقليدي نظامي يضمن استجابة الزر 100% دون أي تعليق -->
-                <form id="ai-form" method="POST" onsubmit="handleFormSubmit(event)">
+                <div id="ai-form">
                     <label><b>🔑 مفتاح الـ API:</b></label>
                     <div class="input-wrapper">
                         <input type="text" name="gemini_token_x" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
-                        <button type="button" class="toggle-view-btn" onclick="maskApiKeyToggle()">👁️</button>
+                        <button type="button" class="toggle-view-btn" onclick="maskApiKeyToggle()">👁️ إخفاء/إظهار</button>
                     </div>
 
                     <label><b>اختر نمط التشغيل المتقدم:</b></label>
@@ -270,10 +264,10 @@ def dashboard():
                     <div id="status-mic"></div>
 
                     <div class="btn-group">
-                        <button type="button" class="mic-btn" onclick="startVoiceRecognition()">🎤 صوتي</button>
-                        <button type="submit" id="submit-btn">🚀 تشغيل المعالجة فائقة السرعة</button>
+                        <button type="button" class="mic-btn" onclick="startVoiceRecognition()">🎤 إدخال صوتي</button>
+                        <button type="button" id="submit-btn" onclick="executeAjaxSubmit()">🚀 تشغيل المعالجة فائقة السرعة</button>
                     </div>
-                </form>
+                </div>
             </div>
 
             <div class="card">
@@ -312,31 +306,41 @@ def dashboard():
             function maskApiKeyToggle() {
                 const input = document.getElementById('api-key-input');
                 isMasked = !isMasked;
-                input.style.webkitTextSecurity = isMasked ? 'disc' : 'none';
+                if (isMasked) {
+                    input.style.webkitTextSecurity = 'disc';
+                } else {
+                    input.style.webkitTextSecurity = 'none';
+                }
             }
 
-            function handleFormSubmit(event) {
-                event.preventDefault();
-                const form = document.getElementById('ai-form');
+            function executeAjaxSubmit() {
+                const apiKeyInput = document.getElementById('api-key-input');
+                const reqTypeSelect = document.getElementById('req-type-select');
+                const queryInput = document.getElementById('query-input');
                 const btn = document.getElementById('submit-btn');
                 const sysStatus = document.getElementById('sys-status');
-                const queryInput = document.getElementById('query-input');
                 
-                if(!queryInput.value.trim()) {
+                const queryVal = queryInput.value.trim();
+                if(!queryVal) {
                     alert("يرجى إدخال السؤال أو الطلب أولاً.");
                     queryInput.focus();
                     return;
                 }
 
+                const formData = new FormData();
+                formData.append('gemini_token_x', apiKeyInput.value.trim());
+                formData.append('req_type', reqTypeSelect.value);
+                formData.append('query', queryVal);
+                
                 btn.disabled = true;
                 btn.innerText = "⏳ جاري إرسال الطلب والمعالجة...";
                 sysStatus.innerText = "⏳ النظام يعمل بأقصى طاقة، يرجى الانتظار...";
 
-                const formData = new FormData(form);
-
                 fetch('/', {
                     method: 'POST',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
                     body: formData
                 })
                 .then(response => response.json())
@@ -385,8 +389,9 @@ def dashboard():
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    // في حال حدث أي استثناء، نقوم بإرسال النموذج بالطريقة العادية لضمان العمل الفوري
-                    form.submit();
+                    btn.disabled = false;
+                    btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
+                    sysStatus.innerText = "⚠ حدث خطأ أثناء الاتصال بالخادم الداخلي.";
                 });
             }
 
@@ -437,7 +442,7 @@ def dashboard():
                     source = source.replace(/^<svg/, '<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"');
                 }
                 if(!source.match(/^<\?xml/)){
-                    source = '<?xml version="1.0" encoding="utf-8"?>\r\n' + source;
+                    source = '<?xml version="1.0" encoding="utf-8"?>\\r\\n' + source;
                 }
                 const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
                 const url = URL.createObjectURL(blob);
@@ -468,13 +473,13 @@ def export_item(item_id):
         return "العنصر المطلوب غير موجود أو انتهت صلاحية الجلسة", 404
     
     filename = f"diamond_global_report_{item_id}.txt"
-    file_content = f"========================================\n" \
-                   f"💎 تقرير النواة الماسية العالمية المتقدمة\n" \
-                   f"========================================\n" \
-                   f"نوع الطلب: {target_item['type']}\n" \
-                   f"وقت التوليد: {target_item['time']}\n" \
-                   f"نص الاستعلام: {target_item['query']}\n\n" \
-                   f"النتيجة والتحليل التقني:\n{target_item['content']}\n"
+    file_content = f"========================================\\n" \
+                   f"💎 تقرير النواة الماسية العالمية المتقدمة\\n" \
+                   f"========================================\\n" \
+                   f"نوع الطلب: {target_item['type']}\\n" \
+                   f"وقت التوليد: {target_item['time']}\\n" \
+                   f"نص الاستعلام: {target_item['query']}\\n\\n" \
+                   f"النتيجة والتحليل التقني:\\n{target_item['content']}\\n"
     
     filepath = os.path.join(BASE_DIR, filename)
     with open(filepath, "w", encoding="utf-8") as f:
