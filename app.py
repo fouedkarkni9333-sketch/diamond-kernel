@@ -109,8 +109,8 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
         return "⚠️ تنبيه من النواة: لم يتم العثور على أي مفتاح API نشط. يرجى إدخال مفتاح Gemini الخاص بك في الحقل المخصص بالأعلى.", ""
 
     try:
-        # استخدام نموذج gemini-1.5-flash عبر واجهة v1 المعتمدة لضمان عدم حدوث خطأ 404
-        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+        # تم تحديث الإصدار هنا حصرياً من v1 إلى v1beta لمنع ظهور خطأ 404 مع نموذج flash
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [{"text": f"التوجيه السياقي العالمي: {sys_prompt}\n\nطلب المستخدم: {user_query}"}]
@@ -146,7 +146,7 @@ def generate_ai_response(req_type, user_query, user_api_key=""):
                 result_text = f"⚠️ خطأ من الخادم برمز الاستجابة: {response.status}"
     except urllib.error.HTTPError as e:
         error_message = e.read().decode('utf-8', errors='ignore')
-        result_text = f"⚠️️ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. تفاصيل الخطأ: {error_message[:150]}"
+        result_text = f"⚠ خطأ API (رمز {e.code}): تحقق من صلاحية مفتاح الـ API. تفاصيل الخطأ: {error_message[:150]}"
     except urllib.error.URLError as e:
         result_text = f"⚠️ خطأ في الشبكة العالمية أو تعذر الوصول للخادم."
     except Exception as e:
@@ -443,7 +443,7 @@ def dashboard():
                     source = source.replace(/^<svg/, '<svg xmlns="[http://www.w3.org/2000/svg](http://www.w3.org/2000/svg)"');
                 }
                 if(!source.match(/^<\?xml/)){
-                    source = '<?xml version="1.0" encoding="utf-8"?>\\r\\n' + source;
+                    source = '<?xml version="1.0" encoding="utf-8"?>\r\n' + source;
                 }
                 const blob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
                 const url = URL.createObjectURL(blob);
@@ -474,13 +474,13 @@ def export_item(item_id):
         return "العنصر المطلوب غير موجود أو انتهت صلاحية الجلسة", 404
     
     filename = f"diamond_global_report_{item_id}.txt"
-    file_content = f"========================================\\n" \
-                   f"💎 تقرير النواة الماسية العالمية المتقدمة\\n" \
-                   f"========================================\\n" \
-                   f"نوع الطلب: {target_item['type']}\\n" \
-                   f"وقت التوليد: {target_item['time']}\\n" \
-                   f"نص الاستعلام: {target_item['query']}\\n\\n" \
-                   f"النتيجة والتحليل التقني:\\n{target_item['content']}\\n"
+    file_content = f"========================================\n" \
+                   f"💎 تقرير النواة الماسية العالمية المتقدمة\n" \
+                   f"========================================\n" \
+                   f"نوع الطلب: {target_item['type']}\n" \
+                   f"وقت التوليد: {target_item['time']}\n" \
+                   f"نص الاستعلام: {target_item['query']}\n\n" \
+                   f"النتيجة والتحليل التقني:\n{target_item['content']}\n"
     
     filepath = os.path.join(BASE_DIR, filename)
     with open(filepath, "w", encoding="utf-8") as f:
