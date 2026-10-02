@@ -15,7 +15,7 @@ else:
     ssl._create_default_https_context = _create_unverified_https_context
 
 try:
-    from flask import Flask, render_template_string, request, redirect, url_for, send_file, session, jsonify
+    from flask import Flask, render_template_string, request, redirect, url_for, send_file, session
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -82,14 +82,7 @@ def persist_to_db(session_id, item_type, query, content, blueprint=""):
     except Exception as e:
         print(f"⚠️ خطأ الحفظ في القاعدة: {e}")
         
-    return {
-        "id": row_id,
-        "type": item_type,
-        "query": query,
-        "content": content,
-        "blueprint": blueprint,
-        "time": t_now
-    }
+    return row_id
 
 def generate_ai_response(req_type, user_query, user_api_key=""):
     result_text = ""
@@ -173,13 +166,9 @@ def dashboard():
         if user_api_key:
             session['saved_api_key'] = user_api_key 
 
-        content, blueprint = "", ""
         if query:
             content, blueprint = generate_ai_response(req_type, query, user_api_key)
-            item_data = persist_to_db(session['session_id'], req_type, query, content, blueprint)
-            
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or (request.content_type and 'application/json' in request.content_type):
-                return jsonify({"status": "success", "item": item_data})
+            persist_to_db(session['session_id'], req_type, query, content, blueprint)
             
         return redirect(url_for('dashboard'))
 
@@ -250,7 +239,8 @@ def dashboard():
             
             <div class="card">
                 <h3>🛠 لوحة التحكم والعمليات المتقدمة</h3>
-                <div id="ai-form">
+                <!-- تم تحويل النموذج إلى Form عادي ليتم إرساله ومعالجته بنجاح تام على Render -->
+                <form method="POST" action="/" id="ai-form" onsubmit="showLoading()">
                     <label><b>🔑 مفتاح الـ API:</b></label>
                     <div class="input-wrapper">
                         <input type="text" name="gemini_token_x" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
@@ -272,9 +262,9 @@ def dashboard():
 
                     <div class="btn-group">
                         <button type="button" class="mic-btn" onclick="startVoiceRecognition()">🎤 إدخال صوتي</button>
-                        <button type="button" id="submit-btn" onclick="executeAjaxSubmit()">🚀 تشغيل المعالجة فائقة السرعة</button>
+                        <button type="submit" id="submit-btn">🚀 تشغيل المعالجة فائقة السرعة</button>
                     </div>
-                </div>
+                </form>
             </div>
 
             <div class="card">
@@ -320,95 +310,12 @@ def dashboard():
                 }
             }
 
-            function executeAjaxSubmit() {
-                const apiKeyInput = document.getElementById('api-key-input');
-                const reqTypeSelect = document.getElementById('req-type-select');
-                const queryInput = document.getElementById('query-input');
+            function showLoading() {
                 const btn = document.getElementById('submit-btn');
                 const sysStatus = document.getElementById('sys-status');
-                
-                const queryVal = queryInput.value.trim();
-                if(!queryVal) {
-                    alert("يرجى إدخال السؤال أو الطلب أولاً.");
-                    queryInput.focus();
-                    return;
-                }
-
-                const formData = new FormData();
-                formData.append('gemini_token_x', apiKeyInput.value.trim());
-                formData.append('req_type', reqTypeSelect.value);
-                formData.append('query', queryVal);
-                
                 btn.disabled = true;
-                btn.innerText = "⏳ جاري إرسال الطلب والمعالجة...";
-                sysStatus.innerText = "⏳ النظام يعمل بأقصى طاقة، يرجى الانتظار...";
-
-                fetch('/', {
-                    method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    btn.disabled = false;
-                    btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
-                    sysStatus.innerText = "🟢 النظام العالمي متصل، مؤمن، ومستعد للعمل بالسرعة القصوى";
-
-                    if(data.status === "success") {
-                        const item = data.item;
-                        const container = document.getElementById('registry-container');
-                        const noMsg = document.getElementById('no-registry-msg');
-                        if(noMsg) noMsg.remove();
-
-                        let blueprintHTML = '';
-                        if(item.blueprint) {
-                            blueprintHTML = `
-                                <div class="blueprint-container" id="svg-box-${item.id}">
-                                    <p style="color: #1f2937; font-size: 13px; margin-bottom: 5px; font-weight: bold;"><b>📊 المخطط الهندسي / الرسم المرئي:</b></p>
-                                    ${item.blueprint}
-                                </div>
-                                <button class="svg-download-btn" type="button" onclick="downloadSVG('svg-box-${item.id}', ${item.id})">📥 تنزيل المخطط حصرياً كملف SVG جاهز</button>
-                            `;
-                        }
-
-                        const newItemHTML = `
-                            <div class="history-item" id="history-item-${item.id}" style="opacity: 0; transition: opacity 0.5s ease;">
-                                <span class="tag">${item.type}</span> <b style="color: var(--text-muted);">[${item.time}]</b>
-                                <p><b>الطلب:</b> ${escapeHtml(item.query)}</p>
-                                <div class="output-box">${escapeHtml(item.content)}</div>
-                                ${blueprintHTML}
-                                <button class="speak-btn" type="button" onclick="speakTextFromElement('history-item-${item.id}')">🗣 الاستماع للتقرير صوتياً</button>
-                                <a href="/export/${item.id}" target="_blank">
-                                    <button class="export-btn" type="button">📥 تصدير التقرير النصي الكامل (TXT)</button>
-                                </a>
-                            </div>
-                        `;
-
-                        container.insertAdjacentHTML('afterbegin', newItemHTML);
-                        setTimeout(() => {
-                            document.getElementById(`history-item-${item.id}`).style.opacity = '1';
-                        }, 50);
-
-                        queryInput.value = '';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    btn.disabled = false;
-                    btn.innerText = "🚀 تشغيل المعالجة فائقة السرعة";
-                    sysStatus.innerText = "⚠ حدث خطأ أثناء الاتصال بالخادم الداخلي.";
-                });
-            }
-
-            function escapeHtml(text) {
-                return text
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;")
-                    .replace(/"/g, "&quot;")
-                    .replace(/'/g, "&#039;");
+                btn.innerText = "⏳ جاري إرسال الطلب والمعالجة (قد يستغرق بضع ثوانٍ)...";
+                sysStatus.innerText = "⏳ يتم الاتصال بخادم الذكاء الاصطناعي، يرجى الانتظار...";
             }
 
             function startVoiceRecognition() {
