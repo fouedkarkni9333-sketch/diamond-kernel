@@ -209,8 +209,8 @@ def dashboard():
             .toggle-view-btn { background: transparent; border: none; color: var(--accent-blue); padding: 0 15px; cursor: pointer; font-size: 14px; font-weight: bold; }
             .toggle-view-btn:hover { opacity: 0.8; }
 
-            input[type="text"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
-            input[type="text"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
+            input[type="text"], input[type="password"], select { width: 100%; padding: 14px; background: #030712; border: 1px solid var(--border-color); color: #fff; border-radius: 8px; box-sizing: border-box; font-size: 15px; margin-bottom: 15px; transition: all 0.3s ease; }
+            input[type="text"]:focus, input[type="password"]:focus, select:focus { border-color: var(--accent-blue); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2); }
             
             .btn-group { display: flex; gap: 12px; }
             button { flex: 1; padding: 14px; background: var(--accent-green); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 15px; transition: all 0.2s; }
@@ -226,9 +226,20 @@ def dashboard():
             .tag { background: var(--accent-blue); color: white; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; }
             #sys-status { font-weight: bold; text-align: center; margin-bottom: 15px; font-size: 14px; color: var(--accent-green); background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.2); }
             #status-mic { font-weight: bold; text-align: center; margin-bottom: 10px; font-size: 13px; color: #f87171; }
+            
+            /* شاشة الانتظار عند إرسال الطلب */
+            #loading-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(9, 13, 22, 0.85); z-index: 9999; justify-content: center; align-items: center; flex-direction: column; color: #60a5fa; font-size: 18px; font-weight: bold; }
+            .spinner { border: 5px solid #1f2937; border-top: 5px solid #3b82f6; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         </style>
     </head>
     <body>
+        <!-- شاشة التحميل لمنع حذف النص ولإظهار حالة المعالجة -->
+        <div id="loading-overlay">
+            <div class="spinner"></div>
+            <div>⏳ جاري معالجة الطلب عبر النواة الذكية، يرجى الانتظار لحظات...</div>
+        </div>
+
         <div class="container">
             <header>
                 <h1>💎🧠 النواة الماسية العالمية المتقدمة</h1>
@@ -239,11 +250,11 @@ def dashboard():
             
             <div class="card">
                 <h3>🛠 لوحة التحكم والعمليات المتقدمة</h3>
-                <!-- تم تحويل النموذج إلى Form عادي ليتم إرساله ومعالجته بنجاح تام على Render -->
-                <form method="POST" action="/" id="ai-form" onsubmit="showLoading()">
+                <form method="POST" action="/" id="ai-form" onsubmit="handleFormSubmit(event)">
                     <label><b>🔑 مفتاح الـ API:</b></label>
                     <div class="input-wrapper">
-                        <input type="text" name="gemini_token_x" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
+                        <!-- تم تغيير نوع الحقل إلى password افتراضياً ليتم حجبه تماماً -->
+                        <input type="password" name="gemini_token_x" id="api-key-input" value="{{ saved_api_key }}" placeholder="ألصق مفتاح Gemini الخاص بك هنا..." autocomplete="off" data-lpignore="true" spellcheck="false">
                         <button type="button" class="toggle-view-btn" onclick="maskApiKeyToggle()">👁️ إخفاء/إظهار</button>
                     </div>
 
@@ -299,23 +310,27 @@ def dashboard():
         </div>
 
         <script>
-            let isMasked = false;
+            // إصلاح زر إخفاء/إظهار كلمة السر بشكل تام عبر تغيير نوع الحقل
             function maskApiKeyToggle() {
                 const input = document.getElementById('api-key-input');
-                isMasked = !isMasked;
-                if (isMasked) {
-                    input.style.webkitTextSecurity = 'disc';
+                if (input.type === 'password') {
+                    input.type = 'text';
                 } else {
-                    input.style.webkitTextSecurity = 'none';
+                    input.type = 'password';
                 }
             }
 
-            function showLoading() {
-                const btn = document.getElementById('submit-btn');
-                const sysStatus = document.getElementById('sys-status');
-                btn.disabled = true;
-                btn.innerText = "⏳ جاري إرسال الطلب والمعالجة (قد يستغرق بضع ثوانٍ)...";
-                sysStatus.innerText = "⏳ يتم الاتصال بخادم الذكاء الاصطناعي، يرجى الانتظار...";
+            // إظهار شاشة الانتظار ومنع مسع النص العشوائي أثناء الإرسال
+            function handleFormSubmit(event) {
+                const queryInput = document.getElementById('query-input');
+                if (!queryInput.value.trim()) {
+                    event.preventDefault();
+                    alert("يرجى إدخال السؤال أو الطلب أولاً.");
+                    queryInput.focus();
+                    return;
+                }
+                // إظهار نافذة التحميل الشفافة
+                document.getElementById('loading-overlay').style.display = 'flex';
             }
 
             function startVoiceRecognition() {
