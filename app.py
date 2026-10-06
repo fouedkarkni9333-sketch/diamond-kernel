@@ -5,7 +5,7 @@ import os
 
 app = Flask(__name__)
 
-# إعداد مفتاح API الخاص بـ Gemini (يمكن وضعه هنا أو عبر متغيرات البيئة)
+# إعداد مفتاح API الخاص بـ Gemini
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
 
 def call_gemini_ultra_engine(prompt, agent_role):
@@ -17,7 +17,7 @@ def call_gemini_ultra_engine(prompt, agent_role):
     system_instruction = f"""
     أنت جزء من نظام 'Diamond Kernel Global Engine' العالمي. 
     الدور الحالي المخصص لك هو: {agent_role}.
-    عليك تقديم أعلى مستوى من الدقة، الاحترافية، والسرعة، وبدون أي أخطاء. استجب باللغة العربية الفصحى أو اللغة التي طلبها المستخدم بدقة متناهية.
+    عليك تقديم أعلى مستوى من الدقة، الاحترافية، والسرعة، وبدون أي أخطاء. استجب باللغة العربية الفصحى أو اللغة التي طلبها المستخدم بدقة متناهية، مع دعم الروابط، الصور، والأشكال الهندسية والتقنية عند الحاجة.
     """
     
     payload = {
@@ -51,7 +51,6 @@ def process_request():
     user_input = data.get('prompt', '')
     selected_agent = data.get('agent', 'The Master Developer & Coder')
     
-    # توجيه الطلب للوكيل المناسب مع محرك الذكاء الاصطناعي الفائق
     result = call_gemini_ultra_engine(user_input, selected_agent)
     return jsonify({"status": "success", "response": result})
 
@@ -194,7 +193,6 @@ HTML_TEMPLATE = """
         <h1>Diamond Kernel Global Engine</h1>
         <div class="subtitle">النظام السحابي الفائق المدعوم بالوكلاء الأربعة الأذكياء ومعالجة الصوت الفورية</div>
 
-        <!-- اختيار الوكلاء الأربعة -->
         <div class="agents-grid">
             <div class="agent-card active" onclick="selectAgent(this, 'The Strategist & Architect')">
                 <h3>1. وكيل التحليل والتخطيط</h3>
@@ -214,7 +212,6 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <!-- منطقة الإدخال -->
         <textarea id="userInput" placeholder="اكتب طلبك هنا، أو استخدم الإدخال الصوتي بالأسفل لتنفيذ أي شيء فوراً..."></textarea>
 
         <div class="controls">
@@ -259,7 +256,6 @@ HTML_TEMPLATE = """
             }
         }
 
-        // نظام معالجة الصوت الفوري (Web Speech API)
         let recognition;
         let isListening = false;
 
@@ -305,7 +301,7 @@ HTML_TEMPLATE = """
             recognition.onend = () => {
                 stopMicUI();
                 if (userInput.value.trim()) {
-                    sendRequest(); // تنفيذ الطلب تلقائياً بعد انتهاء التحدث
+                    sendRequest();
                 }
             };
 
@@ -319,7 +315,6 @@ HTML_TEMPLATE = """
             micBtn.innerText = '🎙️ تحدث بالصوت';
         }
 
-        // ميزة تحويل النصوص إلى صوت (Text-to-Speech)
         function speakOutput() {
             const text = document.getElementById('outputBox').innerText;
             if (!text || text.startsWith('النتائج ستظهر')) return;
@@ -331,6 +326,8 @@ HTML_TEMPLATE = """
     </script>
 </body>
 </html>
+"""
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
