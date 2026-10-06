@@ -21,7 +21,6 @@ except ImportError:
     FLASK_AVAILABLE = False
 
 app = Flask("AbsoluteEnterpriseCoreSystem")
-# مفتاح سري ثابت ومؤمن حصرياً لمنع إعادة توجيه الجلسات أو تسجيل الخروج المفاجئ
 app.secret_key = "foued_absolute_production_fixed_secret_key_2026_secure_core"
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
@@ -144,11 +143,11 @@ def execute_gemini_engine(req_type, user_query):
 
     api_key = get_secure_api_key()
     if not api_key:
-        return "⚠️ خطأ حرج: مفتاح GEMINI_API_KEY غير معرف في متغيرات البيئة على خادم Render. يجدر إضافته لتفعيل الذكاء الاصطناعي.", ""
+        return "⚠️ خطأ حرج: مفتاح GEMINI_API_KEY غير معرف في متغيرات البيئة على خادم Render.", ""
 
     system_prompts = {
-        "research": "أنت وكيل بحث استراتيجي واحترافي. قدم تحليلاً دقيقاً وموثقاً. إذا لزم الأمر، قم بتضمين مخطط SVG حصري داخل الوسم <svg ...>...</svg>.",
-        "blueprint": "أنت خبير هندسي ومعماري متقدم. قدم مواصفات هندسية دقيقة، وأرفق مخططاً هندسياً بصرياً متكاملًا مصمماً بلغة SVG حصرياً داخل الوسم <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 300'>...</svg>.",
+        "research": "أنت وكيل بحث استراتيجي واحترافي. قدم تحليلاً دقيقاً وموثقاً. قم بتضمين مخطط SVG داخل الوسم <svg ...>...</svg> إن لزم.",
+        "blueprint": "أنت خبير هندسي متقدم. قدم مواصفات هندسية دقيقة وأرفق مخططاً بصرياً مصمماً بلغة SVG حصرياً داخل الوسم <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 300'>...</svg>.",
         "image": "أنت مصمم بصري محترف. صف التصميم بدقة وأرفق كود SVG مرئي داخل الوسم <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 300'>...</svg>.",
         "threat": "أنت محلل سيبراني وتقني متطور. قم بتحليل التهديد واقترح إجراءات الوقاية مع تضمين مخطط شبكي بلغة SVG داخل الوسم <svg>...</svg>."
     }
@@ -175,7 +174,7 @@ def execute_gemini_engine(req_type, user_query):
                 try:
                     raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
                 except (KeyError, IndexError):
-                    return "⚠️ استجاب خادم الذكاء الاصطناعي ولكن محتوى الرد كان فارغاً.", ""
+                    return "⚠️ استجاب الخادم ولكن محتوى الرد كان فارغاً.", ""
                 
                 cleaned_text = raw_text
                 if "<svg" in cleaned_text and "</svg>" in cleaned_text:
@@ -190,11 +189,8 @@ def execute_gemini_engine(req_type, user_query):
                     result_text = raw_text
             else:
                 result_text = f"⚠️ خطأ استجابة الخادم الخارجي برمز: {response.status}"
-    except urllib.error.HTTPError as e:
-        error_msg = e.read().decode('utf-8', errors='ignore')
-        result_text = f"⚠ خطأ في بوابة الاتصال الذكي: {error_msg[:150]}"
     except Exception as e:
-        result_text = f"⚠ خطأ تقني غير متوقع في المعالجة: {str(e)}"
+        result_text = f"⚠ خطأ تقني في المعالجة: {str(e)}"
 
     set_cached_response(cache_key, result_text, blueprint_code)
     return result_text, blueprint_code
@@ -204,7 +200,7 @@ LOGIN_HTML = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول - النظام الهندسي للوكيل الذكي 💎</title>
+    <title>تسجيل الدخول - النظام الهندسي الموحد</title>
     <style>
         body { background-color: #07090e; color: #f3f4f6; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-card { background: #0d1322; border: 1px solid #1e293b; padding: 40px; border-radius: 18px; width: 100%; max-width: 420px; box-shadow: 0 20px 40px rgba(0,0,0,0.7); text-align: center; }
@@ -221,12 +217,21 @@ LOGIN_HTML = """<!DOCTYPE html>
     <div class="login-card">
         <h2>💎 النظام الهندسي الموحد</h2>
         <p>أدخل بريدك الإلكتروني المعتمد للوصول الفوري والمستقر إلى لوحة التحكم الذكية</p>
-        <form method="POST">
+        <form method="POST" action="/login" id="login-form">
             <label>البريد الإلكتروني:</label>
-            <input type="email" name="email" placeholder="example@gmail.com" required autocomplete="email">
-            <button type="submit">دخول آمن ومستقر</button>
+            <input type="email" id="email-input" name="email" value="fouedkarkni9333@gmail.com" placeholder="fouedkarkni9333@gmail.com" required autocomplete="email">
+            <button type="submit" id="login-btn">دخول آمن ومستقر</button>
         </form>
     </div>
+    <script>
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            const emailVal = document.getElementById('email-input').value.trim();
+            if (!emailVal || !emailVal.includes('@')) {
+                e.preventDefault();
+                alert('يرجى إدخال بريد إلكتروني صحيح.');
+            }
+        });
+    </script>
 </body>
 </html>"""
 
@@ -319,7 +324,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 {% if registry %}
                     {% for item in registry %}
                         <div class="history-item" id="history-item-{{ item.id }}">
-                            <span class="tag">{{ item.type }}</span> <b style="color: var(--text-muted);">[{{ item.time }}]</b>
+                            <span class="tag">{{ item.type }}</span> <b style="color: var(--text-muted);">[{{ item.time}}]</b>
                             <p><b>الطلب:</b> {{ item.query }}</p>
                             <div class="output-box">{{ item.content }}</div>
                             
