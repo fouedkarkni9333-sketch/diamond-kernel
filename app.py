@@ -6,7 +6,7 @@ import urllib.error
 import ssl
 from datetime import datetime
 
-# تأمين طبقة الاتصال والشهادات الرقمية
+# تأمين طبقة الاتصال والشهادات الرقمية للخوادم السحابية
 try:
     _create_unverified_https_context = ssl._create_unverified_context
 except AttributeError:
@@ -20,15 +20,16 @@ try:
 except ImportError:
     FLASK_AVAILABLE = False
 
-app = Flask("AbsoluteEnterpriseCoreSystem")
-app.secret_key = "foued_absolute_production_fixed_secret_key_2026_secure_core"
+app = Flask("GlobalEnterpriseCoreSystem")
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "foued_global_production_ultra_secure_key_2026")
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_FILE = os.path.join(BASE_DIR, "enterprise_production_core.db")
+DB_FILE = os.path.join(BASE_DIR, "global_production_core.db")
 
 def get_secure_api_key():
+    # جلب مفتاح النظام المركزياً من خادم السحابة (Render) دون طلب أي شيء من المستخدم النهائي
     return os.environ.get("GEMINI_API_KEY", "").strip()
 
 def initialize_enterprise_database():
@@ -143,10 +144,10 @@ def execute_gemini_engine(req_type, user_query):
 
     api_key = get_secure_api_key()
     if not api_key:
-        return "⚠️ خطأ حرج: مفتاح GEMINI_API_KEY غير معرف في متغيرات البيئة على خادم Render.", ""
+        return "⚠️ خطأ تشغيلي مركزي: مفتاح النظام غير معرف في إعدادات الخادم السحابي.", ""
 
     system_prompts = {
-        "research": "أنت وكيل بحث استراتيجي واحترافي. قدم تحليلاً دقيقاً وموثقاً. قم بتضمين مخطط SVG داخل الوسم <svg ...>...</svg> إن لزم.",
+        "research": "أنت وكيل بحث استراتيجي واحترافي عالمي. قدم تحليلاً دقيقاً وموثقاً. قم بتضمين مخطط SVG داخل الوسم <svg ...>...</svg> إن لزم.",
         "blueprint": "أنت خبير هندسي متقدم. قدم مواصفات هندسية دقيقة وأرفق مخططاً بصرياً مصمماً بلغة SVG حصرياً داخل الوسم <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 300'>...</svg>.",
         "image": "أنت مصمم بصري محترف. صف التصميم بدقة وأرفق كود SVG مرئي داخل الوسم <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 500 300'>...</svg>.",
         "threat": "أنت محلل سيبراني وتقني متطور. قم بتحليل التهديد واقترح إجراءات الوقاية مع تضمين مخطط شبكي بلغة SVG داخل الوسم <svg>...</svg>."
@@ -200,7 +201,7 @@ LOGIN_HTML = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل الدخول - النظام الهندسي الموحد</title>
+    <title>تسجيل الدخول - النظام العالمي الموحد</title>
     <style>
         body { background-color: #07090e; color: #f3f4f6; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .login-card { background: #0d1322; border: 1px solid #1e293b; padding: 40px; border-radius: 18px; width: 100%; max-width: 420px; box-shadow: 0 20px 40px rgba(0,0,0,0.7); text-align: center; }
@@ -215,11 +216,11 @@ LOGIN_HTML = """<!DOCTYPE html>
 </head>
 <body>
     <div class="login-card">
-        <h2>💎 النظام الهندسي الموحد</h2>
-        <p>أدخل بريدك الإلكتروني المعتمد للوصول الفوري والمستقر إلى لوحة التحكم الذكية</p>
+        <h2>🌐 النظام العالمي الموحد</h2>
+        <p>أدخل بريدك الإلكتروني للوصول الفوري والآمن إلى لوحة التحكم الذكية</p>
         <form method="POST" action="/login" id="login-form">
             <label>البريد الإلكتروني:</label>
-            <input type="email" id="email-input" name="email" value="fouedkarkni9333@gmail.com" placeholder="fouedkarkni9333@gmail.com" required autocomplete="email">
+            <input type="email" id="email-input" name="email" placeholder="name@example.com" required autocomplete="email">
             <button type="submit" id="login-btn">دخول آمن ومستقر</button>
         </form>
     </div>
@@ -240,7 +241,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة التحكم الهندسية الموحدة 💎</title>
+    <title>لوحة التحكم العالمية الموحدة 🌐</title>
     <style>
         :root {
             --bg-main: #07090e;
@@ -284,8 +285,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div class="container">
         <header>
             <div>
-                <h1>💎🧠 النظام الهندسي الموحد للوكيل الذكي</h1>
-                <p style="color: var(--text-muted); font-size: 13px; margin: 0;">بنية تحتية سحابية إنتاجية خالية من الأخطاء والافتراضات</p>
+                <h1>🌐🧠 النظام العالمي الموحد للوكيل الذكي</h1>
+                <p style="color: var(--text-muted); font-size: 13px; margin: 0;">بنية تحتية سحابية موثوقة تعمل بكفاءة تامة ودون تدخل بالمفاتيح</p>
             </div>
             <div class="user-info">
                 الحساب النشط: <b>{{ user_email }}</b> 
@@ -293,7 +294,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             </div>
         </header>
         
-        <div id="sys-status">🟢 النظام الهندسي متصل ومستقر وجاهز لتنفيذ المهام</div>
+        <div id="sys-status">🟢 النظام العالمي متصل ومستقر وجاهز لتنفيذ المهام</div>
         
         <div class="card">
             <h3>🛠 مركز العمليات (إدخال كتابي أو نطق صوتي مباشر)</h3>
@@ -380,7 +381,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             .then(data => {
                 btn.disabled = false;
                 btn.innerText = "🚀 تنفيذ الطلب فوراً";
-                sysStatus.innerText = "🟢 النظام الهندسي متصل ومستقر وجاهز لتنفيذ المهام";
+                sysStatus.innerText = "🟢 النظام العالمي متصل ومستقر وجاهز لتنفيذ المهام";
 
                 if(data.status === "success") {
                     const item = data.item;
@@ -480,7 +481,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `enterprise_blueprint_${itemId}.svg`;
+            a.download = `global_blueprint_${itemId}.svg`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -551,9 +552,9 @@ def export_item(item_id):
     if not target_item:
         return "العنصر غير موجود أو أنك لا تملك صلاحية الوصول إليه", 404
     
-    filename = f"enterprise_report_{item_id}.txt"
+    filename = f"global_report_{item_id}.txt"
     file_content = f"========================================\n" \
-                   f"💎 التقرير الهندسي الرسمي - النظام الموحد\n" \
+                   f"🌐 التقرير الهندسي الرسمي - النظام العالمي\n" \
                    f"========================================\n" \
                    f"نوع المهمة: {target_item['type']}\n" \
                    f"وقت التنفيذ: {target_item['time']}\n" \
@@ -570,7 +571,7 @@ if __name__ == '__main__':
     initialize_enterprise_database()
     port = int(os.environ.get("PORT", 5080))
     print("=" * 70)
-    print("💎🧠 النظام الهندسي الموحد للوكيل الذكي - قيد التشغيل بكفاءة مطلقة")
+    print("🌐🧠 النظام العالمي الموحد للوكيل الذكي - قيد التشغيل بكفاءة مطلقة")
     print(f"🌍 منفذ التشغيل النشط: {port}")
     print("=" * 70)
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
