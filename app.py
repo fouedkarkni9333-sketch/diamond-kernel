@@ -5,13 +5,9 @@ import os
 
 app = Flask(__name__)
 
-# إعداد مفتاح API الخاص بـ Gemini
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY_HERE")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 def call_gemini_ultra_engine(prompt, agent_role):
-    """
-    محرك الذكاء الاصطناعي الفائق المرتبط بالوكلاء الأربعة المتقدمين (متوافق مع الهيكل الصحيح لـ Gemini API)
-    """
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     system_instruction = f"""
@@ -20,7 +16,6 @@ def call_gemini_ultra_engine(prompt, agent_role):
     عليك تقديم أعلى مستوى من الدقة، الاحترافية، والسرعة، وبدون أي أخطاء. استجب باللغة العربية الفصحى بدقة متناهية، وقدم تفاصيل شاملة ودقيقة لكل طلب يتعلق بالصور، الأشكال الهندسية، التصاميم، أو الأكواد التقنية.
     """
     
-    # البنية الصحيحة المعتمدة لـ Google Gemini API
     payload = {
         "contents": [
             {
@@ -42,7 +37,6 @@ def call_gemini_ultra_engine(prompt, agent_role):
         with urllib.request.urlopen(req) as response:
             res_body = response.read().decode('utf-8')
             res_json = json.loads(res_body)
-            # استخراج النص بدقة من استجابة Gemini
             return res_json['candidates'][0]['content']['parts'][0]['text']
     except urllib.error.HTTPError as e:
         error_message = e.read().decode('utf-8')
@@ -194,3 +188,145 @@ HTML_TEMPLATE = """
             white-space: pre-wrap;
             line-height: 1.6;
         }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Diamond Kernel Global Engine</h1>
+        <div class="subtitle">النظام السحابي الفائق المدعوم بالوكلاء الأربعة الأذكياء ومعالجة الصوت الفورية</div>
+
+        <div class="agents-grid">
+            <div class="agent-card active" onclick="selectAgent(this, 'The Strategist & Architect')">
+                <h3>1. وكيل التحليل والتخطيط</h3>
+                <p>تحليل المشاريع وهندسة الأفكار</p>
+            </div>
+            <div class="agent-card" onclick="selectAgent(this, 'The Master Developer & Coder')">
+                <h3>2. وكيل التوليد والبرمجة</h3>
+                <p>كتابة الأكواد والحلول التقنية</p>
+            </div>
+            <div class="agent-card" onclick="selectAgent(this, 'The Real-Time Voice & Multilingual Agent')">
+                <h3>3. وكيل الصوت والترجمة</h3>
+                <p>المعالجة الصوتية الفورية والترجمة</p>
+            </div>
+            <div class="agent-card" onclick="selectAgent(this, 'The Quality Assurance Agent')">
+                <h3>4. وكيل الجودة والمراجعة</h3>
+                <p>فحص واختبار المخرجات بدقة</p>
+            </div>
+        </div>
+
+        <textarea id="userInput" placeholder="اكتب طلبك هنا، أو استخدم الإدخال الصوتي بالأسفل لتنفيذ أي شيء فوراً..."></textarea>
+
+        <div class="controls">
+            <button onclick="sendRequest()">تنفيذ الطلب الفائق</button>
+            <button id="micBtn" class="mic-btn" onclick="toggleSpeechRecognition()">🎙️ تحدث بالصوت</button>
+            <button onclick="speakOutput()" style="background: #238636;">🔊 الاستماع للرد</button>
+        </div>
+
+        <h3>نتائج التشغيل والوكيل الذكي:</h3>
+        <div id="outputBox" class="output-box">النتائج ستظهر هنا فور اكتمال المعالجة السحابية...</div>
+    </div>
+
+    <script>
+        let currentAgent = 'The Strategist & Architect';
+
+        function selectAgent(element, agentName) {
+            document.querySelectorAll('.agent-card').forEach(card => card.classList.remove('active'));
+            element.classList.add('active');
+            currentAgent = agentName;
+        }
+
+        async function sendRequest() {
+            const prompt = document.getElementById('userInput').value;
+            const outputBox = document.getElementById('outputBox');
+            if (!prompt.trim()) {
+                alert('الرجاء إدخال نص أو التحدث أولاً.');
+                return;
+            }
+
+            outputBox.innerText = '⏳ جاري المعالجة السحابية عبر الوكلاء الأربعة ومحرك الذكاء الاصطناعي الفائق...';
+
+            try {
+                const response = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ prompt: prompt, agent: currentAgent })
+                });
+                const data = await response.json();
+                outputBox.innerText = data.response;
+            } catch (error) {
+                outputBox.innerText = 'حدث خطأ أثناء الاتصال بالخادم السحابي: ' + error;
+            }
+        }
+
+        let recognition;
+        let isListening = false;
+
+        function toggleSpeechRecognition() {
+            const micBtn = document.getElementById('micBtn');
+            const userInput = document.getElementById('userInput');
+
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('عذراً، متصفحك لا يدعم الإدخال الصوتي المباشر.');
+                return;
+            }
+
+            if (isListening) {
+                recognition.stop();
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ar-SA';
+            recognition.continuous = false;
+            recognition.interimResults = true;
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('listening');
+                micBtn.innerText = '🔴 جاري الاستماع...';
+            };
+
+            recognition.onresult = (event) => {
+                let transcript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                userInput.value = transcript;
+            };
+
+            recognition.onerror = (event) => {
+                console.error(event.error);
+                stopMicUI();
+            };
+
+            recognition.onend = () => {
+                stopMicUI();
+                if (userInput.value.trim()) {
+                    sendRequest();
+                }
+            };
+
+            recognition.start();
+        }
+
+        function stopMicUI() {
+            isListening = false;
+            const micBtn = document.getElementById('micBtn');
+            micBtn.classList.remove('listening');
+            micBtn.innerText = '🎙️ تحدث بالصوت';
+        }
+
+        function speakOutput() {
+            const text = document.getElementById('outputBox').innerText;
+            if (!text || text.startsWith('النتائج ستظهر')) return;
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'ar-SA';
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
+"""
